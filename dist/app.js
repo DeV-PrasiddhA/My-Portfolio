@@ -1,0 +1,89 @@
+import * as T from './vendor/three.module.min.js';
+const $=s=>document.querySelector(s),clamp=(x,a=0,b=1)=>Math.max(a,Math.min(b,x)),ease=x=>{x=clamp(x);return x*x*(3-2*x)};
+let seed=42;const rand=()=>{seed=(seed*16807)%2147483647;return(seed-1)/2147483646};
+const reducedQuery=matchMedia('(prefers-reduced-motion: reduce)');let paused=reducedQuery.matches, scrollTarget=0,scrollValue=0,chapter=-1,mx=0,my=0,last=0,time=0;
+const copies=[...document.querySelectorAll('.copy')],nav=[...document.querySelectorAll('.chapters a')];
+function setMotion(){ $('#motion').textContent=paused?'▷  Resume motion':'Ⅱ  Pause motion';$('#motion').setAttribute('aria-pressed',String(paused));document.documentElement.style.scrollBehavior=paused?'auto':'smooth'}setMotion();$('#motion').onclick=()=>{paused=!paused;setMotion()};
+function measure(){scrollTarget=clamp(scrollY/(document.querySelector("#projects").offsetTop-innerHeight))}addEventListener('scroll',measure,{passive:true});addEventListener('pointermove',e=>{mx=e.clientX/innerWidth-.5;my=e.clientY/innerHeight-.5},{passive:true});measure();
+let renderer;try{renderer=new T.WebGLRenderer({antialias:true,powerPreference:'high-performance'});}catch(e){$('#fallback').hidden=false;$('#loading').classList.add('done');}
+if(renderer){
+renderer.setPixelRatio(Math.min(devicePixelRatio,1.7));renderer.setSize(innerWidth,innerHeight);renderer.outputColorSpace=T.SRGBColorSpace;renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=1.25;renderer.shadowMap.enabled=true;renderer.shadowMap.type=T.PCFSoftShadowMap;$('#world').append(renderer.domElement);
+const scene=new T.Scene();scene.background=new T.Color('#080e1b');scene.fog=new T.FogExp2('#080e1b',.007);const camera=new T.PerspectiveCamera(48,innerWidth/innerHeight,.05,500);
+const ambient=new T.HemisphereLight('#9dcfff','#12101a',2);scene.add(ambient);const key=new T.DirectionalLight('#f8cf91',3);key.position.set(12,20,8);key.castShadow=true;key.shadow.mapSize.set(1024,1024);key.shadow.camera.left=-18;key.shadow.camera.right=18;key.shadow.camera.top=18;key.shadow.camera.bottom=-18;scene.add(key);
+const blue=new T.PointLight('#6acfff',25,22);blue.position.set(-3,5,1);scene.add(blue);
+const mat=(color,roughness=.65,metalness=.1)=>new T.MeshStandardMaterial({color,roughness,metalness});
+const charcoal=mat('#101b26'),metal=mat('#34434e',.25,.75),wood=mat('#4b352b'),black=mat('#0b1019'),cream=mat('#cac1a6'),skin=mat('#a7755d'),blueMat=mat('#193347');
+function mesh(g,m,parent,x=0,y=0,z=0){const o=new T.Mesh(g,m);o.position.set(x,y,z);o.castShadow=true;o.receiveShadow=true;parent.add(o);return o}
+function box(parent,x,y,z,w,h,d,m){return mesh(new T.BoxGeometry(w,h,d),m,parent,x,y,z)}
+function sphere(parent,x,y,z,r,m,detail=24){return mesh(new T.SphereGeometry(r,detail,detail),m,parent,x,y,z)}
+function rod(parent,a,b,r,m){const v=new T.Vector3(...a),u=new T.Vector3(...b),dir=u.clone().sub(v),o=mesh(new T.CylinderGeometry(r,r,dir.length(),8),m,parent);o.position.copy(v.add(u).multiplyScalar(.5));o.quaternion.setFromUnitVectors(new T.Vector3(0,1,0),dir.normalize());return o}
+function texture(w,h,paint){const c=document.createElement('canvas');c.width=w;c.height=h;paint(c.getContext('2d'),w,h);const tex=new T.CanvasTexture(c);tex.colorSpace=T.SRGBColorSpace;return tex}
+const room=new T.Group();scene.add(room);
+box(room,0,-.18,2,22,.3,19,mat('#101b29'));for(let i=-10;i<11;i++)box(room,i,-.015,2,.015,.01,19,mat('#26313c'));
+box(room,0,1.8,0,7,.22,3.3,wood);[-3,3].forEach(x=>[-1.2,1.2].forEach(z=>box(room,x,.8,z,.16,1.8,.16,metal)));
+box(room,0,2.1,-.65,1.6,.08,.75,metal);box(room,0,2.6,-.8,.15,1,.15,metal);box(room,0,3.35,-.65,4.35,2.48,.16,black);
+const screenTex=texture(1024,600,(c,w,h)=>{c.fillStyle='#071a29';c.fillRect(0,0,w,h);c.fillStyle='#1e394b';c.fillRect(0,0,w,35);c.fillStyle='#a5c2ce';c.font='15px monospace';c.fillText('PRASIDDHA / intelligence-lab',30,24);c.fillStyle='#102939';c.fillRect(0,35,190,h);c.fillStyle='#73909f';c.font='13px monospace';['EXPLORER','models/','  neural_network.py','  vision.py','experiments/','README.md'].forEach((s,i)=>c.fillText(s,15,75+i*31));const lines=['import torch','from curiosity import possibilities','','class AWorldInTheMaking:','    def __init__(self):','        self.curiosity = float("inf")','','    def build(self, idea):','        learn()','        experiment()','        return something_useful','','# Every world starts somewhere.'];c.font='17px monospace';lines.forEach((s,i)=>{c.fillStyle=i%3===0?'#cda9d9':i%3===1?'#8ecbd4':'#b1c69f';c.fillText(s,220,80+i*29)});c.strokeStyle='#81c9e5';for(let i=0;i<25;i++){const x=720+rand()*240,y=100+rand()*360;c.beginPath();c.arc(x,y,3,0,7);c.stroke()}});
+const screen=mesh(new T.PlaneGeometry(4.12,2.25),new T.MeshBasicMaterial({map:screenTex}),room,0,3.35,-.55);box(room,0,2.0,.63,2.5,.09,.8,black);for(let row=0;row<4;row++)for(let k=0;k<15;k++)box(room,-1.12+k*.16,2.06,.32+row*.17,.12,.035,.115,mat('#455363'));sphere(room,1.9,2.03,.7,.18,charcoal).scale.set(1,.35,1.4);
+const mug=mesh(new T.CylinderGeometry(.21,.18,.43,24),cream,room,-2.65,2.13,.65);mesh(new T.TorusGeometry(.19,.045,8,20),cream,room,-2.9,2.15,.65);box(room,2.4,1.97,-.2,.85,.08,1.15,mat('#79755e'));box(room,2.45,2.06,-.2,.85,.08,1.15,mat('#294650'));
+// Seated figure, built as a deliberately stylized sculptural silhouette.
+const person=new T.Group();person.position.set(-.35,0,2.1);room.add(person);box(person,0,1.1,.2,1.3,.2,1.15,charcoal);box(person,0,1.85,.68,1.25,1.7,.2,black);rod(person,[0,.1,.2],[0,1.1,.2],.1,metal);for(let a=0;a<5;a++){let theta=a/5*Math.PI*2;rod(person,[0,.2,.2],[Math.sin(theta)*.8,.08,.2+Math.cos(theta)*.8],.055,metal)}
+sphere(person,0,2.04,0,.67,blueMat).scale.set(.85,1.25,.6);sphere(person,0,3.14,-.05,.36,skin);sphere(person,0,3.3,.02,.36,black).scale.set(1,1,.92);rod(person,[-.42,2.35,-.05],[-.65,1.95,-.65],.17,blueMat);rod(person,[-.65,1.95,-.65],[-.65,2,-1.24],.12,blueMat);rod(person,[.42,2.35,-.05],[.7,1.95,-.65],.17,blueMat);rod(person,[.7,1.95,-.65],[.65,2,-1.24],.12,blueMat);[-.3,.3].forEach(x=>{sphere(person,x*2,2,-1.27,.13,skin);rod(person,[x,1.2,0],[x,.9,-.75],.21,black);rod(person,[x,.9,-.75],[x,.14,-.85],.16,black);box(person,x,.1,-1,.35,.2,.6,black)});
+// Rainy city beyond the panoramic window.
+const windowGlow=new T.MeshBasicMaterial({color:'#34455a'});for(let i=-3;i<=3;i++)box(room,i*3,5,-4,.08,10,.08,metal);box(room,0,1,-4,20,.08,.08,metal);box(room,0,7,-4,20,.08,.08,metal);
+const city=new T.Group();room.add(city);for(let i=0;i<50;i++){let x=(rand()-.5)*45,z=-7-rand()*15,h=1+rand()*9;box(city,x,h/2-1,z,.8+rand()*1.3,h,1.1,mat('#142334'));for(let k=0;k<h*3;k++)if(rand()>.4)box(city,x+(rand()-.5)*.6,k*.33-1,z+.57,.08,.12,.01,new T.MeshBasicMaterial({color:rand()>.75?'#f6bc70':'#8fb7cb'}))}
+const lamp=new T.PointLight('#f9c77e',8,8);lamp.position.set(3.1,3.7,1);room.add(lamp);rod(room,[3,1.9,.8],[3,4,.5],.04,metal);rod(room,[3,4,.5],[1.9,3.8,.5],.04,metal);box(room,2,3.74,.5,.8,.06,.25,new T.MeshBasicMaterial({color:'#ffe5aa'}));
+// A real spatial tunnel on the far side of the monitor.
+const tunnel=new T.Group();scene.add(tunnel);const glow=new T.MeshBasicMaterial({color:'#72c8de',transparent:true,opacity:.28});for(let i=0;i<28;i++){let z=-3-i*1.9;const ring=mesh(new T.TorusGeometry(3.5+i*.1,.018,4,80),glow,tunnel,0,3.35,z);ring.rotation.z=i*.11;}
+const neural=new T.Group();scene.add(neural);const nodes=[];for(let i=0;i<85;i++){const a=rand()*Math.PI*2,r=4+rand()*12,p=new T.Vector3(Math.cos(a)*r,Math.sin(a)*r+3,-18-rand()*42);nodes.push(p);sphere(neural,p.x,p.y,p.z,.035+rand()*.07,new T.MeshBasicMaterial({color:i%7===0?'#e8bc74':'#75b3ce'}),8)}const linePositions=[];for(let i=0;i<nodes.length;i++)for(let j=i+1;j<nodes.length;j++)if(nodes[i].distanceTo(nodes[j])<5)linePositions.push(...nodes[i].toArray(),...nodes[j].toArray());const lineGeo=new T.BufferGeometry();lineGeo.setAttribute('position',new T.Float32BufferAttribute(linePositions,3));neural.add(new T.LineSegments(lineGeo,new T.LineBasicMaterial({color:'#548aab',transparent:true,opacity:.25})));
+const starGeo=new T.BufferGeometry(),starPositions=[];for(let i=0;i<2300;i++){starPositions.push((rand()-.5)*300,(rand()-.3)*180,-20-rand()*250)}starGeo.setAttribute('position',new T.Float32BufferAttribute(starPositions,3));scene.add(new T.Points(starGeo,new T.PointsMaterial({color:'#c2d5ed',size:.15,transparent:true,opacity:.8,sizeAttenuation:true})));
+// An original procedural Earth: ocean, continent silhouettes, cloud bands, and atmosphere.
+const earthTex=texture(2048,1024,(c,w,h)=>{const grad=c.createLinearGradient(0,0,0,h);grad.addColorStop(0,'#507f9a');grad.addColorStop(.5,'#175176');grad.addColorStop(1,'#1c3c5f');c.fillStyle=grad;c.fillRect(0,0,w,h);const continents=[[[.05,.18],[.12,.12],[.23,.18],[.28,.27],[.22,.35],[.18,.42],[.13,.32],[.08,.29]],[[.22,.42],[.3,.46],[.32,.59],[.29,.72],[.26,.83],[.23,.65]],[[.43,.24],[.5,.18],[.56,.23],[.58,.3],[.52,.34],[.48,.3]],[[.45,.34],[.55,.33],[.59,.45],[.54,.65],[.5,.72],[.46,.57],[.42,.43]],[[.56,.21],[.66,.14],[.8,.18],[.91,.28],[.86,.4],[.77,.42],[.74,.54],[.67,.43],[.61,.4]],[[.78,.65],[.85,.6],[.91,.67],[.88,.75],[.79,.73]],[[.28,.1],[.34,.08],[.35,.2],[.31,.27]]];continents.forEach(poly=>{c.beginPath();poly.forEach((p,i)=>i?c.lineTo(p[0]*w,p[1]*h):c.moveTo(p[0]*w,p[1]*h));c.closePath();c.fillStyle='#66866d';c.fill();c.save();c.clip();for(let i=0;i<2400;i++){c.fillStyle=rand()>.5?'#a0a17d66':'#385c5366';c.fillRect(rand()*w,rand()*h,10+rand()*45,2+rand()*12)}c.restore()});for(let i=0;i<220;i++){c.beginPath();c.ellipse(rand()*w,rand()*h,20+rand()*150,1+rand()*8,-.2,0,7);c.fillStyle='#e4eef122';c.fill()}c.fillStyle='#d2e4eabb';c.fillRect(0,0,w,25);c.fillRect(0,h-35,w,35)});
+const earthPhoto=new T.TextureLoader().load('assets/earth-surface.jpg');earthPhoto.colorSpace=T.SRGBColorSpace;
+const earth=mesh(new T.SphereGeometry(25,80,60),new T.MeshStandardMaterial({map:earthPhoto,roughness:.9}),scene,-13,5,-121);earth.rotation.z=.22;earth.rotation.y=1.2;
+const atmosphere=mesh(new T.SphereGeometry(25.55,64,48),new T.ShaderMaterial({transparent:true,side:T.BackSide,depthWrite:false,blending:T.AdditiveBlending,vertexShader:'varying vec3 n; varying vec3 v; void main(){vec4 p=modelViewMatrix*vec4(position,1.); n=normalize(normalMatrix*normal);v=normalize(-p.xyz);gl_Position=projectionMatrix*p;}',fragmentShader:'varying vec3 n;varying vec3 v;void main(){float f=pow(1.-abs(dot(normalize(n),normalize(v))),3.);gl_FragColor=vec4(.2,.55,1.,f*.6);}'}),scene,-13,5,-121);
+const sunTex=texture(128,128,c=>{const g=c.createRadialGradient(64,64,0,64,64,64);g.addColorStop(0,'rgba(255,244,211,1)');g.addColorStop(.15,'rgba(255,216,145,.9)');g.addColorStop(.4,'rgba(255,168,75,.3)');g.addColorStop(1,'rgba(255,160,60,0)');c.fillStyle=g;c.fillRect(0,0,128,128)});const sun=new T.Sprite(new T.SpriteMaterial({map:sunTex,transparent:true,depthWrite:false,blending:T.AdditiveBlending}));sun.position.set(24,19,-133);sun.scale.set(65,65,1);scene.add(sun);const sunlight=new T.DirectionalLight('#ffd498',5);sunlight.position.set(30,25,-100);scene.add(sunlight);
+// Faceted rock promontory, small ridges and a lone explorer.
+const land=new T.Group();scene.add(land);const rockmat=mat('#344052',.95);const terrainGeo=new T.PlaneGeometry(160,110,100,85);terrainGeo.rotateX(-Math.PI/2);const vertices=terrainGeo.attributes.position;for(let i=0;i<vertices.count;i++){const x=vertices.getX(i),z=vertices.getZ(i);let y=Math.sin(x*.16)*1.5+Math.cos(z*.17)*1.2+Math.sin(x*.63+z*.21)*.4+(rand()-.5)*.4;const edge=-5+Math.sin(x*.13)*3;if(z<edge)y-=Math.min(20,(edge-z)*1.8);vertices.setY(i,y-5)}terrainGeo.computeVertexNormals();mesh(terrainGeo,rockmat,land,0,0,-71);
+for(let i=0;i<55;i++){let x=(rand()-.5)*60,z=-52+rand()*25;const r=.3+rand()*1.4;const rock=mesh(new T.IcosahedronGeometry(r,1),mat(i%3?'#3b4653':'#53606a'),land,x,-4+Math.sin(x*.16),z);rock.scale.set(1,.5+rand(),1)}
+const explorer=new T.Group();explorer.position.set(-1,-3.8,-70);land.add(explorer);sphere(explorer,0,1.65,0,.22,black);sphere(explorer,0,1.08,0,.37,black).scale.set(.85,1.6,.6);[-.16,.16].forEach(x=>rod(explorer,[x,.8,0],[x,.05,.04],.1,black));[-1,1].forEach(s=>rod(explorer,[s*.28,1.4,0],[s*.4,.65,.06],.085,black));
+const fireflies=new T.Group();land.add(fireflies);for(let i=0;i<35;i++)sphere(fireflies,(rand()-.5)*50,-2+rand()*5,-55+rand()*20,.025,new T.MeshBasicMaterial({color:'#e7c889'}),6);
+const cameraPath=[{p:0,c:[8,5.3,12],l:[-1,2.8,0]},{p:.12,c:[5.4,4.6,8],l:[0,3.25,-.6]},{p:.27,c:[.1,3.35,2],l:[0,3.35,-8]},{p:.36,c:[0,3.35,-7],l:[0,3.35,-35]},{p:.52,c:[0,4,-27],l:[0,5,-90]},{p:.64,c:[7,7,-44],l:[-4,5,-112]},{p:.82,c:[9,5,-53],l:[-5,4,-105]},{p:1,c:[7,4.5,-57],l:[-5,4,-105]}];
+const cv=new T.Vector3(),look=new T.Vector3();function updateCamera(p){let a=cameraPath[0],b=cameraPath[1];for(let i=0;i<cameraPath.length-1;i++)if(p>=cameraPath[i].p){a=cameraPath[i];b=cameraPath[i+1]}const k=ease((p-a.p)/(b.p-a.p));cv.fromArray(a.c).lerp(new T.Vector3(...b.c),k);look.fromArray(a.l).lerp(new T.Vector3(...b.l),k);if(innerWidth<760&&p<.27)cv.x+=3;cv.x+=paused?0:mx*.35;cv.y+=paused?0:-my*.2;camera.position.copy(cv);camera.lookAt(look);room.visible=false;tunnel.visible=p>.2&&p<.59;neural.visible=p>.25;land.visible=p>.57;earth.visible=p>.55;atmosphere.visible=earth.visible;sun.visible=earth.visible;scene.fog.density=p<.3?.009:.0018;glow.opacity=.28*(1-ease((p-.48)/.12));}
+function ui(p){const sceneY=window.cinematicY??scrollY;const projectsTop=document.querySelector("#projects").offsetTop;const projectActive=sceneY>projectsTop+innerHeight*.12;document.body.classList.toggle("project-mode",projectActive);document.querySelector(".intro-atmosphere").style.opacity=ease((p-.75)/.08);updatePhoto(p);updateEarthPhoto(p);updateTunnel(p);const op=[1-ease((p-.12)/.11),ease((p-.49)/.055)*(1-ease((p-.68)/.06)),ease((p-.78)/.06)];copies.forEach((el,i)=>{el.style.opacity=op[i];el.classList.toggle('active',op[i]>.6);el.inert=op[i]<.6;el.setAttribute('aria-hidden',String(op[i]<.6));el.style.transform=`translateY(${(1-op[i])*24}px)`});const retreat=ease((sceneY-(projectsTop-innerHeight*1.25))/(innerHeight*1.4));const intro=copies[2];intro.style.transform=paused?"none":`perspective(1100px) translateZ(${-retreat*2200}px) scale(${1-retreat*.65})`;intro.style.opacity=op[2]*(1-ease((retreat-.65)/.35));document.querySelector(".intro-atmosphere").style.opacity=ease((p-.75)/.08)*(1-retreat);let next=p<.29?0:p<.5?1:p<.76?2:3;if(next!==chapter){chapter=next;nav.forEach((n,i)=>{n.classList.toggle('active',i===next);if(i===next)n.setAttribute('aria-current','step');else n.removeAttribute('aria-current')});$('#chapter-number').textContent='0'+(next+1);$('#chapter-title').textContent=['The workspace','Through the network','Beyond the screen','Meet Prasiddha'][next];$('#scroll-next').href=['#tunnel','#welcome','#intro','#projects'][next];$('#scroll-next').innerHTML=['SCROLL TO STEP INSIDE','KEEP GOING','KEEP EXPLORING','EXPLORE THE PROJECTS'][next]+' <span>↓</span>'}$('.progress i').style.width=p*100+'%'}
+function resize(){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);measure()}addEventListener('resize',resize);renderer.domElement.addEventListener('webglcontextlost',e=>{e.preventDefault();$('#fallback').hidden=false});
+function frame(ms){requestAnimationFrame(frame);const dt=Math.min((ms-last)/1000,.05);last=ms;scrollValue=paused?scrollTarget:T.MathUtils.damp(scrollValue,scrollTarget,8,dt);if(!paused){time+=dt;earth.rotation.y+=dt*.008;neural.rotation.z=Math.sin(time*.08)*.015;fireflies.position.y=Math.sin(time*.7)*.15}window.cinematicY=paused?scrollY:T.MathUtils.damp(window.cinematicY??scrollY,scrollY,6,dt);updateCamera(scrollValue);ui(scrollValue);renderer.render(scene,camera)}requestAnimationFrame(frame);$('#loading').classList.add('done');
+}else{document.querySelectorAll('.copy').forEach(el=>{el.style.position='relative';el.style.opacity=1;el.style.pointerEvents='auto';el.style.top='auto'});document.querySelectorAll('.chapter-space').forEach(el=>{el.style.height='auto';el.style.minHeight='100vh';el.style.paddingTop='150px'})}
+
+
+function updatePhoto(p){
+ const layer=document.querySelector('#photo-entry'),photo=document.querySelector('#entry-photo'),zoom=document.querySelector('.photo-zoom');
+ if(!layer||!photo)return;
+ const t=ease((p-.04)/.24),fade=ease((p-.25)/.055);
+ const x=photo.offsetLeft+photo.offsetWidth*.552,y=photo.offsetTop+photo.offsetHeight*.496;
+ layer.style.opacity=1-fade;layer.style.visibility=fade>=1?'hidden':'visible';
+ zoom.style.transformOrigin=x+'px '+y+'px';
+ zoom.style.transform=paused?'none':`translate(${(innerWidth/2-x)*t}px,${(innerHeight/2-y)*t}px) scale(${1+t*10})`;
+ document.querySelector('.photo-shade').style.opacity=1-ease(p/.14);
+ document.querySelector('.photo-backdrop').style.opacity=1-ease(p/.17);
+}
+
+function updateEarthPhoto(p){
+ const layer=document.querySelector('#earth-photo-scene'),photo=document.querySelector('.earth-photo-main');
+ if(!layer)return;
+ const reveal=ease((p-.47)/.065),travel=clamp((p-.535)/.465);
+ layer.style.opacity=reveal;layer.style.visibility=reveal>0?'visible':'hidden';
+ photo.style.transform=paused?'none':`scale(${1+travel*.1}) translateY(${-travel*2}%)`;
+}
+
+function updateTunnel(p){
+ const el=document.querySelector('#tunnel-scene');if(!el)return;
+ const alpha=ease((p-.245)/.055)*(1-ease((p-.47)/.065)),t=clamp((p-.25)/.28);
+ el.style.opacity=alpha;el.style.visibility=alpha>.001?'visible':'hidden';
+ el.classList.toggle('still',paused);
+ el.querySelector('.tunnel-image').style.transform=paused?'scale(1.15)':`scale(${1.1+t*2.8}) rotate(${-7+t*17}deg)`;
+ el.querySelector('.tunnel-caption').style.opacity=ease((p-.30)/.03)*(1-ease((p-.42)/.04));
+ el.querySelector('.tunnel-streaks').style.transform=`scale(${1+t*.6}) rotate(${t*12}deg)`;
+}
+
+
+
